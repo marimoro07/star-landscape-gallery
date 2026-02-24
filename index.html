@@ -4,321 +4,1088 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>星景・風景ギャラリー — 星空と風景写真</title>
-  <meta name="description" content="趣味で撮影した星景写真と風景写真のギャラリー。ダークテーマで写真を際立たせる縦スクロール表示、Lightbox、Lazy Loadingに対応。">
-  <!-- basicLightbox (軽量Lightboxライブラリ) -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/basiclightbox@5.0.4/dist/basicLightbox.min.css">
+  <meta name="description" content="趣味で撮影した星景写真と風景写真のギャラリー。星空アニメーション背景で没入感のある写真体験をお楽しみください。">
+  <meta property="og:title" content="星景・風景ギャラリー — 星空と風景写真">
+  <meta property="og:description" content="趣味で撮影した星景写真と風景写真のギャラリー。">
+  <meta property="og:type" content="website">
+  <meta name="theme-color" content="#0B0F1A">
+
+  <!-- Google Fonts: Orbitron (futuristic) + Noto Serif JP (elegant) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
   <style>
-    /* Reset-ish */
-    :root{
-      --bg: #071029; /* 深い濃紺 */
-      --panel-bg: linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.6));
-      --text: #e6eef8;
-      --muted: #98a6bf;
-      --accent: #9ad3ff;
+    /* ============================================
+       CSS Variables & Reset
+       ============================================ */
+    :root {
+      --bg: #0B0F1A;
+      --bg-secondary: #0f1525;
+      --panel-bg: linear-gradient(180deg, rgba(11,15,26,0.4), rgba(11,15,26,0.75));
+      --text: #E0E6F0;
+      --muted: #8A95AD;
+      --accent: #4FC3F7;
+      --accent-glow: rgba(79,195,247,0.25);
+      --accent-hover: #81D4FA;
+      --card-bg: rgba(255,255,255,0.04);
+      --card-border: rgba(255,255,255,0.06);
       --max-width: 1200px;
-    }
-    *{box-sizing: border-box}
-    html,body{height:100%;}
-    body{
-      margin:0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", sans-serif;
-      background: radial-gradient(ellipse at 20% 0%, rgba(255,255,255,0.02), transparent 15%), var(--bg);
-      color:var(--text);
-      -webkit-font-smoothing:antialiased;
-      -moz-osx-font-smoothing:grayscale;
-      line-height:1.45;
+      --font-display: 'Orbitron', sans-serif;
+      --font-body: 'Noto Serif JP', serif;
+      --radius: 16px;
+      --radius-sm: 10px;
     }
 
-    /* Header */
-    header{
-      position:sticky;
-      top:0;
-      z-index:40;
-      backdrop-filter: blur(6px);
-      background: linear-gradient(180deg, rgba(5,10,20,0.6), rgba(5,10,20,0.35));
-      border-bottom:1px solid rgba(255,255,255,0.03);
-    }
-    .container{max-width:var(--max-width);margin:0 auto;padding:18px;display:flex;align-items:center;justify-content:space-between;gap:12px}
-    .site-title{font-weight:700;letter-spacing:0.4px}
-    nav a{color:var(--muted);text-decoration:none;margin-left:14px;font-size:0.95rem}
-    nav a:hover{color:var(--accent)}
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    /* Main gallery - vertical sections */
-    main{
-      scroll-snap-type: y mandatory;
-      overflow-y:auto;
-      height:calc(100vh - 72px); /* allow header */
-    }
-    .panel{
-      scroll-snap-align: start;
-      min-height:100vh;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding:48px 20px;
-      position:relative;
-      background: var(--panel-bg);
+    html {
+      scroll-behavior: smooth;
     }
 
-    /* Image card */
-    .photo-wrap{
-      width:100%;
-      max-width:var(--max-width);
-      display:flex;
-      gap:24px;
-      align-items:center;
-      justify-content:center;
-      flex-direction:column;
-      text-align:center;
-    }
-    .photo{
-      width:100%;
-      max-height:80vh;
-      object-fit:contain;
-      border-radius:12px;
-      box-shadow: 0 10px 30px rgba(2,6,16,0.65);
-      cursor:zoom-in;
-      transition:transform .25s ease, box-shadow .25s ease;
-      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.02));
-    }
-    .photo:focus{outline:2px solid rgba(154,211,255,0.15)}
-    .photo:hover{transform:translateY(-6px)}
-
-    .caption{
-      margin-top:14px;color:var(--muted);font-size:0.95rem;max-width:900px
+    /* === FIX: Single scrollbar — body handles ALL scrolling === */
+    body {
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      line-height: 1.6;
+      overflow-y: auto;
+      overflow-x: hidden;
+      min-height: 100vh;
     }
 
-    /* Footer */
-    footer{
-      padding:28px 20px;border-top:1px solid rgba(255,255,255,0.03);text-align:center;color:var(--muted)
+    /* ============================================
+       Star Canvas Background
+       ============================================ */
+    #star-canvas {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 0;
+      pointer-events: none;
     }
 
-    /* Responsive tweaks */
-    @media (min-width:900px){
-      .photo-wrap{flex-direction:column}
+    /* ============================================
+       Loading Screen
+       ============================================ */
+    #loading-screen {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 9999;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.8s ease, visibility 0.8s ease;
     }
-    @media (max-width:600px){
-      .container{padding:12px}
-      header .site-title{font-size:1rem}
-      nav a{display:none}
-      .caption{padding:0 10px}
+    #loading-screen.fade-out {
+      opacity: 0;
+      visibility: hidden;
+    }
+    .loading-title {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      color: var(--accent);
+      letter-spacing: 4px;
+      margin-bottom: 20px;
+      animation: pulse-glow 2s ease-in-out infinite;
+    }
+    .loading-ring {
+      width: 50px; height: 50px;
+      border: 2px solid rgba(79,195,247,0.15);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
     }
 
-    /* Accessibility: focus visible */
-    :focus{outline: none}
-    :focus-visible{outline:2px dashed var(--accent);outline-offset:4px}
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes pulse-glow {
+      0%,100% { opacity: 0.6; text-shadow: 0 0 10px var(--accent-glow); }
+      50% { opacity: 1; text-shadow: 0 0 25px var(--accent-glow), 0 0 50px rgba(79,195,247,0.1); }
+    }
 
+    /* ============================================
+       Header
+       ============================================ */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      backdrop-filter: blur(16px) saturate(1.4);
+      -webkit-backdrop-filter: blur(16px) saturate(1.4);
+      background: linear-gradient(180deg, rgba(11,15,26,0.85), rgba(11,15,26,0.6));
+      border-bottom: 1px solid rgba(79,195,247,0.08);
+      transition: background 0.3s ease;
+    }
+    .header-inner {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .site-title {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1.1rem;
+      letter-spacing: 2px;
+      color: var(--text);
+      text-transform: uppercase;
+    }
+    .site-title .accent { color: var(--accent); }
+    nav { display: flex; gap: 6px; }
+    nav a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.88rem;
+      padding: 6px 14px;
+      border-radius: 20px;
+      transition: all 0.3s ease;
+      font-family: var(--font-body);
+    }
+    nav a:hover {
+      color: var(--accent);
+      background: rgba(79,195,247,0.08);
+    }
+
+    /* ============================================
+       Hero Section
+       ============================================ */
+    .hero {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 100px 24px 60px;
+    }
+    .hero h1 {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      font-weight: 900;
+      letter-spacing: 6px;
+      background: linear-gradient(135deg, var(--accent), #B39DDB, var(--accent));
+      background-size: 200% auto;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: gradient-shift 6s ease-in-out infinite;
+    }
+    .hero p {
+      color: var(--muted);
+      font-size: 1rem;
+      margin-top: 16px;
+      max-width: 500px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    @keyframes gradient-shift {
+      0%,100% { background-position: 0% center; }
+      50% { background-position: 200% center; }
+    }
+
+    /* ============================================
+       Section Titles
+       ============================================ */
+    .section-title {
+      font-family: var(--font-display);
+      font-size: 1.2rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-align: center;
+      color: var(--accent);
+      margin-bottom: 40px;
+      text-transform: uppercase;
+      position: relative;
+    }
+    .section-title::after {
+      content: '';
+      display: block;
+      width: 50px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      margin: 12px auto 0;
+    }
+
+    /* ============================================
+       Map Section (Top overview map)
+       ============================================ */
+    .map-section {
+      position: relative;
+      z-index: 1;
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 40px 24px 60px;
+    }
+    .map-container {
+      width: 100%;
+      height: 400px;
+      border-radius: var(--radius);
+      overflow: hidden;
+      border: 1px solid var(--card-border);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    .map-container .leaflet-container {
+      background: #0d1117;
+    }
+
+    /* ============================================
+       Gallery Grid
+       ============================================ */
+    .gallery-section {
+      position: relative;
+      z-index: 1;
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 20px 24px 60px;
+    }
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 28px;
+    }
+
+    /* ============================================
+       Photo Card
+       ============================================ */
+    .photo-card {
+      position: relative;
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(8px);
+      cursor: pointer;
+      transition: transform 0.4s cubic-bezier(0.25,0.46,0.45,0.94),
+                  box-shadow 0.4s ease,
+                  border-color 0.4s ease;
+    }
+    .photo-card:hover {
+      transform: translateY(-8px) scale(1.01);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 40px var(--accent-glow);
+      border-color: rgba(79,195,247,0.15);
+    }
+    .photo-card:hover .card-img {
+      transform: scale(1.06);
+    }
+    .photo-card:hover .card-overlay {
+      opacity: 1;
+    }
+
+    .card-img-wrapper {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16/10;
+      overflow: hidden;
+      background: rgba(255,255,255,0.02);
+    }
+    .card-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.6s cubic-bezier(0.25,0.46,0.45,0.94);
+      opacity: 0;
+      animation: none;
+    }
+    .card-img.loaded {
+      animation: fade-in-up 0.6s ease forwards;
+    }
+
+    @keyframes fade-in-up {
+      from { opacity: 0; transform: translateY(12px) scale(1); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .card-overlay {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      padding: 40px 20px 16px;
+      background: linear-gradient(transparent, rgba(11,15,26,0.9));
+      opacity: 0;
+      transition: opacity 0.4s ease;
+      display: flex;
+      align-items: flex-end;
+    }
+    .card-overlay-title {
+      font-family: var(--font-display);
+      font-size: 0.85rem;
+      letter-spacing: 2px;
+      color: #fff;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+    }
+
+    .card-info {
+      padding: 16px 20px 20px;
+    }
+    .card-title {
+      font-family: var(--font-display);
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+    .card-caption {
+      font-size: 0.85rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .card-location {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.78rem;
+      color: var(--accent);
+      margin-top: 8px;
+      opacity: 0.8;
+    }
+
+    /* ============================================
+       Custom Modal
+       ============================================ */
+    .modal-backdrop {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 100;
+      background: rgba(5,8,16,0.92);
+      backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.35s ease, visibility 0.35s ease;
+      padding: 20px;
+    }
+    .modal-backdrop.active {
+      opacity: 1;
+      visibility: visible;
+    }
+    .modal-content {
+      position: relative;
+      max-width: 900px;
+      width: 100%;
+      max-height: 92vh;
+      overflow-y: auto;
+      background: linear-gradient(180deg, rgba(15,21,37,0.95), rgba(11,15,26,0.98));
+      border-radius: var(--radius);
+      border: 1px solid rgba(79,195,247,0.1);
+      box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 60px rgba(79,195,247,0.05);
+      transform: translateY(20px) scale(0.97);
+      transition: transform 0.35s ease;
+    }
+    .modal-backdrop.active .modal-content {
+      transform: translateY(0) scale(1);
+    }
+    .modal-close {
+      position: absolute;
+      top: 16px; right: 16px;
+      z-index: 10;
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(11,15,26,0.7);
+      color: var(--muted);
+      font-size: 1.2rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(8px);
+    }
+    .modal-close:hover {
+      background: rgba(79,195,247,0.15);
+      color: var(--text);
+      border-color: rgba(79,195,247,0.2);
+    }
+    .modal-img {
+      width: 100%;
+      max-height: 60vh;
+      object-fit: contain;
+      background: #0a0d15;
+      border-radius: var(--radius) var(--radius) 0 0;
+    }
+    .modal-body {
+      padding: 24px;
+    }
+    .modal-title {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+    .modal-caption {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .modal-location {
+      font-size: 0.85rem;
+      color: var(--accent);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .modal-map {
+      width: 100%;
+      height: 250px;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      border: 1px solid var(--card-border);
+      margin-top: 8px;
+    }
+
+    /* Modal Navigation arrows */
+    .modal-nav {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(11,15,26,0.6);
+      color: var(--muted);
+      font-size: 1.2rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(8px);
+      z-index: 10;
+    }
+    .modal-nav:hover {
+      background: rgba(79,195,247,0.15);
+      color: var(--text);
+      border-color: rgba(79,195,247,0.2);
+    }
+    .modal-nav.prev { left: -56px; }
+    .modal-nav.next { right: -56px; }
+
+    /* ============================================
+       Footer
+       ============================================ */
+    footer {
+      position: relative;
+      z-index: 1;
+      padding: 48px 24px 32px;
+      border-top: 1px solid rgba(79,195,247,0.06);
+      text-align: center;
+      background: linear-gradient(180deg, transparent, rgba(11,15,26,0.5));
+    }
+    .footer-inner {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .about-name {
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      letter-spacing: 2px;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+    .about-bio {
+      font-size: 0.88rem;
+      color: var(--muted);
+      max-width: 500px;
+      margin: 0 auto 16px;
+    }
+    .social-links {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .social-links a {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.85rem;
+      padding: 6px 16px;
+      border-radius: 20px;
+      border: 1px solid rgba(79,195,247,0.15);
+      transition: all 0.3s ease;
+    }
+    .social-links a:hover {
+      background: rgba(79,195,247,0.1);
+      border-color: rgba(79,195,247,0.3);
+    }
+
+    /* Visitor Counter */
+    .visitor-counter {
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(255,255,255,0.04);
+    }
+    .visitor-label {
+      font-size: 0.72rem;
+      letter-spacing: 2px;
+      color: var(--muted);
+      text-transform: uppercase;
+      font-family: var(--font-display);
+      margin-bottom: 4px;
+    }
+    .visitor-count {
+      font-family: var(--font-display);
+      font-size: 1.4rem;
+      color: var(--accent);
+      letter-spacing: 3px;
+      font-weight: 700;
+    }
+
+    .copyright {
+      font-size: 0.75rem;
+      color: rgba(138,149,173,0.5);
+      margin-top: 20px;
+    }
+
+    /* ============================================
+       Scrollbar Styling
+       ============================================ */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(79,195,247,0.2);
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(79,195,247,0.35);
+    }
+
+    /* ============================================
+       Accessibility
+       ============================================ */
+    :focus { outline: none; }
+    :focus-visible { outline: 2px dashed var(--accent); outline-offset: 4px; }
+
+    /* ============================================
+       Responsive
+       ============================================ */
+    @media (max-width: 900px) {
+      .gallery-grid {
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 20px;
+      }
+      .modal-nav.prev { left: 8px; }
+      .modal-nav.next { right: 8px; }
+      .modal-content { max-width: 95vw; }
+    }
+    @media (max-width: 600px) {
+      .header-inner { padding: 12px 16px; }
+      .site-title { font-size: 0.85rem; letter-spacing: 1px; }
+      nav a { display: none; }
+      .hero { padding: 70px 16px 40px; }
+      .hero h1 { letter-spacing: 3px; }
+      .gallery-section { padding: 20px 16px 40px; }
+      .gallery-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+      .map-container { height: 280px; }
+      .map-section { padding: 20px 16px 40px; }
+      .modal-nav { display: none; }
+      .modal-map { height: 180px; }
+    }
+
+    /* ============================================
+       Leaflet popup custom style
+       ============================================ */
+    .leaflet-popup-content-wrapper {
+      background: rgba(15,21,37,0.95) !important;
+      color: var(--text) !important;
+      border-radius: 10px !important;
+      border: 1px solid rgba(79,195,247,0.15) !important;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4) !important;
+    }
+    .leaflet-popup-tip {
+      background: rgba(15,21,37,0.95) !important;
+    }
+    .leaflet-popup-content {
+      font-family: var(--font-body) !important;
+      font-size: 0.85rem !important;
+      line-height: 1.5 !important;
+    }
+    .popup-title {
+      font-family: var(--font-display);
+      font-size: 0.75rem;
+      letter-spacing: 1px;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
   </style>
 </head>
 <body>
+
+  <!-- Loading Screen -->
+  <div id="loading-screen" aria-hidden="true">
+    <div class="loading-title">STAR GALLERY</div>
+    <div class="loading-ring"></div>
+  </div>
+
+  <!-- Star Animation Canvas -->
+  <canvas id="star-canvas" aria-hidden="true"></canvas>
+
+  <!-- Header -->
   <header>
-    <div class="container">
-      <div class="site-title">星景・風景ギャラリー</div>
-      <nav aria-label="Site Navigation">
+    <div class="header-inner">
+      <div class="site-title">
+        <span class="accent">★</span> 星景・風景ギャラリー
+      </div>
+      <nav aria-label="サイトナビゲーション">
         <a href="#gallery">ギャラリー</a>
+        <a href="#map-overview">撮影地マップ</a>
         <a href="#about">プロフィール</a>
         <a href="#contact">SNS</a>
       </nav>
     </div>
   </header>
 
-  <!-- Main vertical gallery. Panels are generated by JavaScript for easy additions -->
-  <main id="gallery" role="main" aria-label="写真ギャラリー">
-    <!-- JS will inject .panel elements here -->
-  </main>
+  <!-- Hero -->
+  <section class="hero">
+    <h1>STAR LANDSCAPE</h1>
+    <p>星空と風景を中心に、日本各地で撮影した写真を展示しています。</p>
+  </section>
 
-  <footer id="about">
-    <div class="container" style="flex-direction:column;align-items:center;">
-      <div style="max-width:800px">
-        <strong>撮影者: まりも</strong>
-        <p id="contact" style="margin:6px 0 0 0">星空と風景を中心に撮影しています。機材や撮影地についてはSNSで公開中。</p>
-        <p style="margin:10px 0 0 0">
-          <a href="https://www.instagram.com/marimo_8732/?locale=ja_JP" style="color:var(--accent);text-decoration:none;margin-right:10px">Instagram</a>
-          <a href="https://www.threads.com/@marimo_8732?xmt=AQF07pXfbK0Z3ElCHzfXDW0_boo5Z6JWMe70ocIODbV0axk" style="color:var(--accent);text-decoration:none">Threads</a>
-        </p>
+  <!-- Shooting Location Map (overview) -->
+  <section class="map-section" id="map-overview">
+    <h2 class="section-title">撮影地マップ</h2>
+    <div class="map-container">
+      <div id="overview-map" style="width:100%;height:100%"></div>
+    </div>
+  </section>
+
+  <!-- Gallery -->
+  <section class="gallery-section" id="gallery">
+    <h2 class="section-title">ギャラリー</h2>
+    <div class="gallery-grid" id="gallery-grid">
+      <!-- JS will inject photo cards here -->
+    </div>
+  </section>
+
+  <!-- Photo Detail Modal -->
+  <div class="modal-backdrop" id="modal" role="dialog" aria-modal="true" aria-label="写真詳細">
+    <button class="modal-nav prev" id="modal-prev" aria-label="前の写真">‹</button>
+    <div class="modal-content" id="modal-content">
+      <button class="modal-close" id="modal-close" aria-label="閉じる">✕</button>
+      <img class="modal-img" id="modal-img" src="" alt="">
+      <div class="modal-body">
+        <div class="modal-title" id="modal-title"></div>
+        <div class="modal-caption" id="modal-caption"></div>
+        <div class="modal-location" id="modal-location">
+          <span>📍</span>
+          <span id="modal-location-text"></span>
+        </div>
+        <div class="modal-map" id="modal-map-container"></div>
       </div>
-      <small style="margin-top:12px;color:var(--muted)">© <span id="year"></span> まりも — All rights reserved.</small>
+    </div>
+    <button class="modal-nav next" id="modal-next" aria-label="次の写真">›</button>
+  </div>
+
+  <!-- Footer -->
+  <footer id="about">
+    <div class="footer-inner">
+      <div class="about-name">撮影者: まりも</div>
+      <p class="about-bio" id="contact">
+        星空と風景を中心に撮影しています。機材や撮影地についてはSNSで公開中。
+      </p>
+      <div class="social-links">
+        <a href="https://www.instagram.com/marimo_8732/?locale=ja_JP" target="_blank" rel="noopener">Instagram</a>
+        <a href="https://www.threads.com/@marimo_8732?xmt=AQF07pXfbK0Z3ElCHzfXDW0_boo5Z6JWMe70ocIODbV0axk" target="_blank" rel="noopener">Threads</a>
+      </div>
+
+      <!-- Visitor Counter -->
+      <div class="visitor-counter">
+        <div class="visitor-label">Total Visitors</div>
+        <div class="visitor-count" id="visitor-count">—</div>
+      </div>
+
+      <div class="copyright">
+        &copy; <span id="year"></span> まりも — All rights reserved.
+      </div>
     </div>
   </footer>
 
-  <!-- basicLightbox script -->
-  <script src="https://cdn.jsdelivr.net/npm/basiclightbox@5.0.4/dist/basicLightbox.min.js"></script>
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
   <script>
-    /* ==========================
-       Gallery data (add images here)
-       - Use absolute or relative URLs
-       - Keep objects small: {src, alt, title, caption}
-       - This array drives the page so adding an object = adding a photo
-       ========================== */
+    /* ============================================
+       Gallery Data
+       ============================================
+       各写真に lat, lng, locationName を追加。
+       ※ 緯度・経度は撮影者が実際のデータに差し替えてください。 */
     const gallery = [
-      {src: 'images/DSC00037.jpg', alt:'星宿り', title:'星宿り', caption:'薄い雲のかかった星空 — 撮影地: 男鹿市'},
-      {src: 'images/stack26.jpg', alt:'天の川', title:'天の川', caption:'夏の天の川を縦構図で撮影'},
-      {src: 'images/stack済み27.jpg', alt:'北緯40°の石像', title:'北緯40度を示す灯', caption:'入道崎と天の川'},
-      {src: 'https://picsum.photos/seed/land2/1400/900', alt:'草原と小道', title:'草原の小道', caption:'広がる草原の一枚'},
-      {src: 'https://picsum.photos/seed/star3/1600/1000', alt:'星と樹', title:'星と樹', caption:'一本の樹と満天の星空'}
+      {
+        src: 'images/DSC00037.jpg',
+        alt: '星宿り',
+        title: '星宿り',
+        caption: '薄い雲のかかった星空',
+        lat: 37.05,
+        lng: 136.93,
+        locationName: '石川県七尾市 田鶴浜'
+      },
+      {
+        src: 'images/stack26.jpg',
+        alt: '天の川',
+        title: '天の川',
+        caption: '夏の天の川を縦構図で撮影',
+        lat: 35.36,
+        lng: 138.73,
+        locationName: '山梨県'
+      },
+      {
+        src: 'images/stack済み27.jpg',
+        alt: '北緯40°の矢像',
+        title: '北緯40度を示す像',
+        caption: '入道崎と天の川',
+        lat: 39.94,
+        lng: 139.70,
+        locationName: '秋田県男鹿市 入道崎'
+      },
+      {
+        src: 'https://picsum.photos/seed/land2/1400/900',
+        alt: '草原と小道',
+        title: '草原の小道',
+        caption: '広がる草原の一枚',
+        lat: 35.85,
+        lng: 137.10,
+        locationName: '長野県'
+      },
+      {
+        src: 'https://picsum.photos/seed/star3/1600/1000',
+        alt: '星と樹',
+        title: '星と樹',
+        caption: '一本の樹と満天の星空',
+        lat: 35.12,
+        lng: 138.50,
+        locationName: '静岡県'
+      }
     ];
 
-    // Inject current year
+    /* ============================================
+       Inject current year
+       ============================================ */
     document.getElementById('year').textContent = new Date().getFullYear();
 
-    const main = document.getElementById('gallery');
+    /* ============================================
+       Star Canvas Animation
+       ============================================ */
+    (function initStars() {
+      const canvas = document.getElementById('star-canvas');
+      const ctx = canvas.getContext('2d');
+      let stars = [];
+      const STAR_COUNT = 200;
 
-    // Build panels from the gallery array
+      function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+      resize();
+      window.addEventListener('resize', resize);
+
+      for (let i = 0; i < STAR_COUNT; i++) {
+        stars.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          size: Math.random() * 1.8 + 0.3,
+          opacity: Math.random() * 0.6 + 0.2,
+          speed: Math.random() * 0.0008 + 0.0003,
+          phase: Math.random() * Math.PI * 2
+        });
+      }
+
+      function draw(time) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        stars.forEach(star => {
+          const flicker = Math.sin(time * star.speed + star.phase) * 0.3 + 0.7;
+          ctx.beginPath();
+          ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(200,220,255,${star.opacity * flicker})`;
+          ctx.fill();
+        });
+        requestAnimationFrame(draw);
+      }
+      requestAnimationFrame(draw);
+    })();
+
+    /* ============================================
+       Build Gallery Cards
+       ============================================ */
+    const gridEl = document.getElementById('gallery-grid');
+
     gallery.forEach((item, index) => {
-      const panel = document.createElement('section');
-      panel.className = 'panel';
-      panel.setAttribute('data-index', index);
+      const card = document.createElement('div');
+      card.className = 'photo-card';
+      card.setAttribute('tabindex', '0');
+      card.setAttribute('role', 'button');
+      card.setAttribute('aria-label', `${item.title} の詳細を表示`);
 
-      const wrap = document.createElement('div');
-      wrap.className = 'photo-wrap';
+      card.innerHTML = `
+        <div class="card-img-wrapper">
+          <img class="card-img" data-src="${escapeHtml(item.src)}" alt="${escapeHtml(item.alt)}"
+               src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+               loading="lazy">
+          <div class="card-overlay">
+            <span class="card-overlay-title">${escapeHtml(item.title)}</span>
+          </div>
+        </div>
+        <div class="card-info">
+          <div class="card-title">${escapeHtml(item.title)}</div>
+          <div class="card-caption">${escapeHtml(item.caption)}</div>
+          ${item.locationName ? `<div class="card-location">📍 ${escapeHtml(item.locationName)}</div>` : ''}
+        </div>
+      `;
 
-      // We'll use a low-cost placeholder and lazy-load the actual image via data-src.
-      const img = document.createElement('img');
-      img.className = 'photo';
-      img.alt = item.alt || item.title || `photo-${index}`;
-      img.setAttribute('data-src', item.src);
-      img.setAttribute('loading','lazy'); // fallback
-      // small inline placeholder (1x1 transparent) to keep layout
-      img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
-      img.tabIndex = 0; // make focusable for keyboard users
+      card.addEventListener('click', () => openModal(index));
+      card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openModal(index); }
+      });
 
-      // Captions & title
-      const caption = document.createElement('div');
-      caption.className = 'caption';
-      caption.innerHTML = `<strong style="color:var(--text)">${escapeHtml(item.title || '')}</strong><div style="margin-top:6px">${escapeHtml(item.caption || '')}</div>`;
-
-      wrap.appendChild(img);
-      wrap.appendChild(caption);
-      panel.appendChild(wrap);
-      main.appendChild(panel);
-
-      // Click opens lightbox. Use index to support next/prev navigation.
-      img.addEventListener('click', () => openLightbox(index));
-      img.addEventListener('keydown', (e) => { if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLightbox(index); } });
+      gridEl.appendChild(card);
     });
 
-    /* ==========================
-       Lazy loading via IntersectionObserver
-       - loads image src when near viewport
-       - also preloads the next image for smoother UX
-       ========================== */
+    /* ============================================
+       Lazy Loading via IntersectionObserver
+       ============================================ */
     const lazyObserver = new IntersectionObserver((entries, obs) => {
       entries.forEach(entry => {
-        if(entry.isIntersecting){
+        if (entry.isIntersecting) {
           const img = entry.target;
           const src = img.getAttribute('data-src');
-          if(src){
+          if (src) {
             img.src = src;
             img.removeAttribute('data-src');
-            // preload next image
-            const parentPanel = img.closest('.panel');
-            const nextPanel = parentPanel && parentPanel.nextElementSibling;
-            if(nextPanel){
-              const nextImg = nextPanel.querySelector('img[data-src]');
-              if(nextImg){
-                const nextSrc = nextImg.getAttribute('data-src');
-                const pre = new Image(); pre.src = nextSrc; // browser caches it
-              }
-            }
+            img.onload = () => img.classList.add('loaded');
+            img.onerror = () => img.classList.add('loaded');
           }
           obs.unobserve(img);
         }
       });
-    },{root:null,rootMargin:'200px',threshold:0.1});
+    }, { rootMargin: '300px', threshold: 0.01 });
 
-    document.querySelectorAll('img.photo').forEach(img=>lazyObserver.observe(img));
+    document.querySelectorAll('.card-img').forEach(img => lazyObserver.observe(img));
 
-    /* ==========================
-       Lightbox logic using basicLightbox
-       - supports left/right arrow navigation
-       - displays caption
-       ========================== */
-    let currentIndex = 0;
-    let instance = null;
+    /* ============================================
+       Overview Map (all shooting locations)
+       ============================================ */
+    (function initOverviewMap() {
+      const mapEl = document.getElementById('overview-map');
+      const map = L.map(mapEl, {
+        scrollWheelZoom: false,
+        attributionControl: true
+      }).setView([37.5, 138.0], 6);
 
-    function openLightbox(index){
-      currentIndex = index;
-      const item = gallery[index];
-      const content = `
-        <div style="max-width:90vw;max-height:90vh;display:flex;flex-direction:column;align-items:center;justify-content:center">
-          <img src="${item.src}" alt="${escapeHtml(item.alt)}" style="max-width:100%;max-height:84vh;border-radius:6px;box-shadow:0 20px 60px rgba(0,0,0,0.7);" />
-          <div style="color:#cfe9ff;margin-top:10px;text-align:center;font-size:0.95rem">${escapeHtml(item.title || '')} — ${escapeHtml(item.caption || '')}</div>
-        </div>
-      `;
-      instance = basicLightbox.create(content, {
-        closable: true,
-        onShow: (inst) => { document.addEventListener('keydown', onKey); },
-        onClose: (inst) => { document.removeEventListener('keydown', onKey); }
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 19
+      }).addTo(map);
+
+      const accentIcon = L.divIcon({
+        className: '',
+        html: `<div style="width:14px;height:14px;background:var(--accent);border-radius:50%;border:2px solid #fff;box-shadow:0 0 12px rgba(79,195,247,0.5);"></div>`,
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
       });
-      instance.show();
-    }
 
-    function onKey(e){
-      if(!instance) return;
-      if(e.key === 'ArrowRight'){
-        navigate(1);
-      } else if(e.key === 'ArrowLeft'){
-        navigate(-1);
-      } else if(e.key === 'Escape'){
-        instance.close();
-      }
-    }
-
-    function navigate(dir){
-      let next = currentIndex + dir;
-      if(next < 0) next = gallery.length -1;
-      if(next >= gallery.length) next = 0;
-      currentIndex = next;
-      // replace content of lightbox
-      const item = gallery[currentIndex];
-      if(instance && instance.visible()){
-        const newContent = `
-          <div style="max-width:90vw;max-height:90vh;display:flex;flex-direction:column;align-items:center;justify-content:center">
-            <img src="${item.src}" alt="${escapeHtml(item.alt)}" style="max-width:100%;max-height:84vh;border-radius:6px;box-shadow:0 20px 60px rgba(0,0,0,0.7);" />
-            <div style="color:#cfe9ff;margin-top:10px;text-align:center;font-size:0.95rem">${escapeHtml(item.title || '')} — ${escapeHtml(item.caption || '')}</div>
-          </div>
-        `;
-        instance.element().querySelector('.basicLightbox--placeholder')?.remove?.();
-        instance.close();
-        // show new
-        instance = basicLightbox.create(newContent, {closable:true, onShow:(inst)=>document.addEventListener('keydown', onKey), onClose:(inst)=>document.removeEventListener('keydown', onKey)});
-        instance.show();
-      }
-    }
-
-    /* ==========================
-       Utility: simple HTML-escape
-       ========================== */
-    function escapeHtml(str){
-      if(!str) return '';
-      return String(str).replace(/[&<>\"']/g, function (s) {
-        return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"})[s];
-      });
-    }
-
-    /* ==========================
-       Accessibility: allow scroll-snap with keyboard
-       ========================== */
-    // Optional: let Page Up/Down / Space / Arrow keys scroll between panels on main
-    (function keyboardScroll(){
-      let panels = Array.from(document.querySelectorAll('.panel'));
-      let current = 0;
-      window.addEventListener('keydown', (e)=>{
-        if(document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
-        if(['ArrowDown','PageDown',' '].includes(e.key)){
-          e.preventDefault(); current = Math.min(current+1, panels.length-1); panels[current].scrollIntoView({behavior:'smooth'});
-        } else if(['ArrowUp','PageUp'].includes(e.key)){
-          e.preventDefault(); current = Math.max(current-1, 0); panels[current].scrollIntoView({behavior:'smooth'});
+      const bounds = [];
+      gallery.forEach((item, idx) => {
+        if (item.lat && item.lng) {
+          const marker = L.marker([item.lat, item.lng], { icon: accentIcon }).addTo(map);
+          marker.bindPopup(`
+            <div class="popup-title">${escapeHtml(item.title)}</div>
+            <div>${escapeHtml(item.locationName || '')}</div>
+          `);
+          marker.on('click', () => openModal(idx));
+          bounds.push([item.lat, item.lng]);
         }
       });
-
-      // Update current index on scroll
-      const panelObserver = new IntersectionObserver((entries)=>{
-        entries.forEach(en=>{ if(en.isIntersecting){ current = panels.indexOf(en.target); } });
-      },{threshold:0.6});
-      panels.forEach(p=>panelObserver.observe(p));
+      if (bounds.length > 1) {
+        map.fitBounds(bounds, { padding: [40, 40] });
+      }
     })();
 
+    /* ============================================
+       Modal Logic
+       ============================================ */
+    let currentIndex = 0;
+    let modalMap = null;
+    const modalEl = document.getElementById('modal');
+    const modalImg = document.getElementById('modal-img');
+    const modalTitle = document.getElementById('modal-title');
+    const modalCaption = document.getElementById('modal-caption');
+    const modalLocationText = document.getElementById('modal-location-text');
+    const modalLocationEl = document.getElementById('modal-location');
+    const modalMapContainer = document.getElementById('modal-map-container');
+
+    function openModal(index) {
+      currentIndex = index;
+      renderModal();
+      modalEl.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal() {
+      modalEl.classList.remove('active');
+      document.body.style.overflow = '';
+      if (modalMap) {
+        modalMap.remove();
+        modalMap = null;
+      }
+    }
+
+    function renderModal() {
+      const item = gallery[currentIndex];
+      modalImg.src = item.src;
+      modalImg.alt = item.alt;
+      modalTitle.textContent = item.title || '';
+      modalCaption.textContent = item.caption || '';
+
+      if (item.locationName) {
+        modalLocationText.textContent = item.locationName;
+        modalLocationEl.style.display = '';
+      } else {
+        modalLocationEl.style.display = 'none';
+      }
+
+      // Map
+      if (modalMap) {
+        modalMap.remove();
+        modalMap = null;
+      }
+
+      if (item.lat && item.lng) {
+        modalMapContainer.style.display = '';
+        // Small delay to allow container to be visible
+        setTimeout(() => {
+          modalMap = L.map(modalMapContainer, {
+            scrollWheelZoom: false,
+            zoomControl: true
+          }).setView([item.lat, item.lng], 10);
+
+          L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OSM &copy; CARTO',
+            subdomains: 'abcd',
+            maxZoom: 19
+          }).addTo(modalMap);
+
+          const pinIcon = L.divIcon({
+            className: '',
+            html: `<div style="width:16px;height:16px;background:#4FC3F7;border-radius:50%;border:3px solid #fff;box-shadow:0 0 16px rgba(79,195,247,0.6);"></div>`,
+            iconSize: [16, 16],
+            iconAnchor: [8, 8]
+          });
+
+          L.marker([item.lat, item.lng], { icon: pinIcon }).addTo(modalMap);
+          modalMap.invalidateSize();
+        }, 100);
+      } else {
+        modalMapContainer.style.display = 'none';
+      }
+    }
+
+    function navigateModal(dir) {
+      let next = currentIndex + dir;
+      if (next < 0) next = gallery.length - 1;
+      if (next >= gallery.length) next = 0;
+      currentIndex = next;
+      renderModal();
+    }
+
+    // Event listeners
+    document.getElementById('modal-close').addEventListener('click', closeModal);
+    document.getElementById('modal-prev').addEventListener('click', () => navigateModal(-1));
+    document.getElementById('modal-next').addEventListener('click', () => navigateModal(1));
+
+    modalEl.addEventListener('click', (e) => {
+      if (e.target === modalEl) closeModal();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (!modalEl.classList.contains('active')) return;
+      if (e.key === 'Escape') closeModal();
+      if (e.key === 'ArrowRight') navigateModal(1);
+      if (e.key === 'ArrowLeft') navigateModal(-1);
+    });
+
+    /* ============================================
+       Visitor Counter (localStorage-based demo)
+       ============================================
+       NOTE: This is a client-side only counter for
+       demonstration. For accurate analytics, connect
+       to Firebase Realtime Database or Google Analytics.
+
+       To integrate Firebase:
+       1. Create Firebase project
+       2. Add firebase config
+       3. Use firebase.database().ref('visitors')
+          .transaction(count => (count || 0) + 1)
+       ============================================ */
+    (function initVisitorCounter() {
+      const counterEl = document.getElementById('visitor-count');
+      const STORAGE_KEY = 'star-gallery-visitors';
+      const VISITED_KEY = 'star-gallery-visited';
+
+      let count = parseInt(localStorage.getItem(STORAGE_KEY) || '0', 10);
+
+      // Count unique visits (once per session)
+      if (!sessionStorage.getItem(VISITED_KEY)) {
+        count++;
+        localStorage.setItem(STORAGE_KEY, count.toString());
+        sessionStorage.setItem(VISITED_KEY, 'true');
+      }
+
+      // Animate number
+      animateCounter(counterEl, count);
+    })();
+
+    function animateCounter(el, target) {
+      const duration = 1200;
+      const start = performance.now();
+      const initial = 0;
+
+      function update(now) {
+        const elapsed = now - start;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const current = Math.round(initial + (target - initial) * eased);
+        el.textContent = current.toLocaleString();
+        if (progress < 1) requestAnimationFrame(update);
+      }
+      requestAnimationFrame(update);
+    }
+
+    /* ============================================
+       Loading Screen
+       ============================================ */
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        document.getElementById('loading-screen').classList.add('fade-out');
+      }, 600);
+    });
+
+    /* ============================================
+       Utility: HTML Escape
+       ============================================ */
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, s =>
+        ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"})[s]
+      );
+    }
   </script>
 </body>
 </html>
